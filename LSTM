@@ -74,8 +74,8 @@ def RNN(X,weights,biases):
 
 
 pred = RNN(x,weights,biases)
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y))
-train_op = tf.train.AdamOptimizer(lr).minimizer(cost) #lr = learning rate
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=y))
+train_op = tf.train.AdamOptimizer(lr).minimize(cost) #lr = learning rate
 
 
 correct_pred =tf.equal(tf.argmax(pred,1),tf.argmax(y,1))
@@ -86,7 +86,7 @@ with tf.Session() as sess:
     sess.run(init)
     step = 0
     while step*batch_size<traing_iters:
-        batch_xs,batch_ys =mnist.next_batch(batch_size)
+        batch_xs,batch_ys =mnist.train.next_batch(batch_size)
         batch_xs = batch_xs.reshape([batch_size,n_steps,n_inputs])
         sess.run([train_op],feed_dict={
             x:batch_xs,
