@@ -1,0 +1,100 @@
+import tensorflow as tf
+from tensorflow.examples.tutorials.mnist import input_data
+##################################
+#我们可以将图片看成是每一行像素看成一个序列进行N行组合得到。
+
+
+#this is data
+mnist = input_data.read_data_sets('MNIST_data',one_hot=True)
+
+#hyperparameters
+lr = 0.001
+traing_iters = 100000
+batch_size = 128 #一个批次内包含的样本数
+
+n_inputs = 28 #MNIST data input (img shape 28*28) input_size:
+              # 原始的训练数据的大小 即图片的列数，设置为28
+n_steps =28 #time step
+            #每个数据包含的输入序列数 即图片的行数
+            #图片有几行就有几个time_step，也就是n_steps
+n_hidden_units = 128 #neurous in hidden layer
+n_classes = 10 #MNIST classes(0-9 digits)
+
+#tf Grapg input
+x = tf.placeholder(tf.float32,[None,n_steps,n_inputs])
+y = tf.placeholder(tf.float32,[None,n_classes])
+
+
+#Define weights
+weights = {
+    #(28,128)
+    'in':tf.Variable(tf.random_normal([n_inputs,n_hidden_units])),
+    #(128,28)
+    'out':tf.Variable(tf.random_normal([n_hidden_units,n_classes]))
+}
+biases = {
+    #(128,)
+    'in':tf.Variable(tf.constant(0.1,shape=[n_hidden_units,])),
+    #(10,)
+    'out':tf.Variable(tf.constant(0.1,shape=[n_classes,]))
+}
+
+
+def RNN(X,weights,biases):
+    # hidden layer for input to cell
+    ################################
+    #X(128 batch,28 steps,28 inputs)
+    #==>(128*28,28 inputs)
+    X = tf.reshape(X,[-1,n_inputs])
+    # X_in ==(128 batch*28 steps,128 hidden)
+    X_in = tf.matmul(X,weights['in'])+biases['in']
+    #X_in ==>(128 batch,28 steps,128 hidden)
+    X_in = tf.reshape(X_in,[-1,n_steps,n_hidden_units])
+
+    #cell
+    ###########################################
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(n_hidden_units,forget_bias=1.0,state_is_tuple=True)
+    #lstm cell is divided into two parts (c_state,m_state)
+    #可以理解为c_state为之前保留下来的记忆，m_state为当前产生的记忆。
+    # 吴恩达的课程对应是否更新记忆细胞c<t>
+    _init_state =lstm_cell.zero_state(batch_size,dtype=tf.float32)
+
+    outputs,states =tf.nn.dynamic_rnn(lstm_cell,X_in,initial_state=_init_state,time_major =False)
+    #outputs是最后一层每个step的输出,states是每一层的最后那个step的输出
+    #LSTM的state是由ct和ht组成的。ct是记忆细胞，ht是输出。
+
+
+    #hidden layer for output as the final results
+    #############################################
+    results = tf.matmul(states[1],weights['out']) + biases['out']
+
+    return results
+
+
+
+
+pred = RNN(x,weights,biases)
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, y))
+train_op = tf.train.AdamOptimizer(lr).minimizer(cost) #lr = learning rate
+
+
+correct_pred =tf.equal(tf.argmax(pred,1),tf.argmax(y,1))
+accuracy = tf.reduce_mean(tf.cast(correct_pred,tf.float32))
+
+init = tf.initialize_all_variables()
+with tf.Session() as sess:
+    sess.run(init)
+    step = 0
+    while step*batch_size<traing_iters:
+        batch_xs,batch_ys =mnist.next_batch(batch_size)
+        batch_xs = batch_xs.reshape([batch_size,n_steps,n_inputs])
+        sess.run([train_op],feed_dict={
+            x:batch_xs,
+            y:batch_ys,
+        })
+        if step % 20 ==0:
+            print(sess.run(accuracy,feed_dict={
+            x:batch_xs,
+            y:batch_ys,
+        }))
+        step +=1
